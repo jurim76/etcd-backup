@@ -1,0 +1,107 @@
+image:
+  registry: jurim
+  repository: etcd-backup
+  pullPolicy: Always
+  tag: ""
+
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+podLabels:
+  app.kubernetes.io/name: etcd-backup
+
+podAnnotations: {}
+
+podSecurityContext:
+# fsGroup: 5001
+
+serviceAccount:
+  enabled: false
+  name: ""
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  runAsUser: 5001
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+volumes:
+  - name: etcd-certs
+    hostPath:
+      path: /etc/kubernetes/pki/etcd
+  - name: data
+    emptyDir: {}
+
+volumeMounts:
+  - mountPath: /opt/backup/data
+    name: data
+  - mountPath: /opt/backup/etcd
+    name: etcd-certs
+    readOnly: true
+
+# run on controlplane
+nodeSelector:
+  node-role.kubernetes.io/control-plane:
+
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+
+affinity: {}
+
+# required for etcd snapshot
+hostNetwork: true
+
+# run pod in debug mode
+debug: false
+
+# backup cron schedule
+schedule: "@monthly"
+
+env:
+  - name: cacert_file
+    value: "/opt/backup/etcd/ca.crt"
+  - name: cert_file
+    value: "/opt/backup/etcd/server.crt"
+  - name: key_file
+    value: "/opt/backup/etcd/server.key"
+  - name: etcd_endpoints
+    value: "https://127.0.0.1:2379"
+  - name: ACCESS_KEY_ID
+    valueFrom:
+      secretKeyRef:
+        name: aws-s3
+        key: access_key
+  - name: ACCESS_SECRET_KEY
+    valueFrom:
+      secretKeyRef:
+        name: aws-s3
+        key: secret_key
+  - name: S3_ENDPOINT
+    valueFrom:
+      secretKeyRef:
+        name: aws-s3
+        key: endpoint
+        optional: true
+  - name: S3_BUCKET
+    valueFrom:
+      secretKeyRef:
+        name: aws-s3
+        key: bucket
+        optional: true
+  - name: ENV_NAME
+    valueFrom:
+      configMapKeyRef:
+        name: environment-name
+        key: env
+        optional: true
