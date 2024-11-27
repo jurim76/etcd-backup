@@ -5,7 +5,7 @@ metadata:
   labels: {{- toYaml .Values.podLabels | nindent 4 }}
 spec:
   concurrencyPolicy: Replace
-  schedule: {{ .Values.schedule | quote }}
+  schedule: {{ .Values.backup.schedule | quote }}
   jobTemplate:
     spec:
       template:
@@ -15,7 +15,7 @@ spec:
           imagePullSecrets:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- if and (.Values.serviceAccount.enabled) (.Values.serviceAccount.name) }}
+          {{- if .Values.serviceAccount.name }}
           serviceAccountName: {{ .Values.serviceAccount.name }}
           {{- end }}
           {{- if .Values.hostNetwork }}
@@ -28,17 +28,9 @@ spec:
               image: {{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
               imagePullPolicy: {{ .Values.image.pullPolicy }}
               env: {{- toYaml .Values.env | nindent 16 }}
-              {{- if .Values.debug }}
               command:
-                - sleep
-              args:
-                - infinity
-              {{- else }}
-              command:
-                - /etcd-backup.sh
-              args:
-                - backup
-              {{- end }}
+                - /entrypoint.sh
+              args: {{- toYaml .Values.backup.args | nindent 16 }}
               resources:
                 {{- toYaml .Values.resources | nindent 16 }}
               {{- with .Values.volumeMounts }}

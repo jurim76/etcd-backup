@@ -18,8 +18,8 @@ podSecurityContext:
 # fsGroup: 5001
 
 serviceAccount:
-  enabled: false
-  name: ""
+  create: false
+  name: postgres-pod
 
 securityContext:
   capabilities:
@@ -62,11 +62,17 @@ affinity: {}
 # required for etcd snapshot
 hostNetwork: true
 
-# run pod in debug mode
-debug: false
+pod:
+  # create pod
+  enabled: true
 
-# backup cron schedule
-schedule: "@monthly"
+backup:
+  # backup schedule
+  schedule: "@hourly"
+  # backup command arguments
+  args:
+    - /etcd-backup.sh
+    - backup
 
 env:
   - name: cacert_file

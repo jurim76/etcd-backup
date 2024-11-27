@@ -1,3 +1,9 @@
 ETCD backup tool
 
-Creates encrypted backups by schedule and stores in AWS S3 bucket
+## Features
+- Create encrypted backup by schedule and upload to AWS S3 bucket
+- Download backup from S3 bucket and prepare backup to restore
+- Send notification to slack channel
+- Vault secret file support
+
+[Helm chart](https://github.com/jurim76/etcd-backup/tree/main/chart/etcd-backup)

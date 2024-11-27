@@ -8,7 +8,7 @@ host=$(hostname -s)
 dest_file_name="etcd-snapshot_${host}_${dateStamp}"
 dest_file="$dest_folder/${dest_file_name}.db"
 # slack channel webhook
-WEBHOOK_URL="${WEBHOOK_URL:-''}"
+WEBHOOK_URL="$WEBHOOK_URL"
 S3_BUCKET="${S3_BUCKET:-etcd-backup}"
 
 if [ -z "$cacert_file" ] || ! [ -f "$cacert_file" ]; then
@@ -207,7 +207,7 @@ function decompress() {
 function put_on_s3() {
   local FILE_TO_UPLOAD="$1"
   local FILE_NAME=$(basename "$FILE_TO_UPLOAD")
-  echo "Uploading $FILE_NAME on s3"
+  echo "Uploading $FILE_NAME on s3/${S3_BUCKET}"
   mc cp -q "$FILE_TO_UPLOAD" "s3/${S3_BUCKET}/etcd/${FILE_NAME}"
   local upload_status=$?
   check_result $upload_status
@@ -230,6 +230,7 @@ function upload_to_s3() {
 
 function download_from_s3() {
   local FILE_TO_DOWNLOAD="$1"
+  echo "Downloading $FILE_TO_DOWNLOAD from s3/${S3_BUCKET}"
   mc cp -q "s3/${S3_BUCKET}/etcd/${FILE_TO_DOWNLOAD}" "${FILE_TO_DOWNLOAD}"
   local download_status=$?
   check_result $download_status
@@ -242,7 +243,15 @@ function list_s3_files() {
   mc ls -q "s3/${S3_BUCKET}/etcd"
 }
 
+function check_s3_bucket() {
+  echo "Checking S3 bucket $S3_BUCKET"
+  mc stat -q "s3/${S3_BUCKET}"
+  local bucket_status=$?
+  check_result $bucket_status
+}
+
 function DefaultAction() {
+  check_s3_bucket
   get_snapshot
   verify_snapshot
   encrypt_snapshot

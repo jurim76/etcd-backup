@@ -1,0 +1,52 @@
+{{- if .Values.pod.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: etcd-backup
+  labels: {{- toYaml .Values.podLabels | nindent 4 }}
+spec:
+  containers:
+  - name: {{ .Chart.Name }}
+    securityContext:
+      {{- toYaml .Values.securityContext | nindent 6 }}
+    image: {{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}
+    imagePullPolicy: {{ .Values.image.pullPolicy }}
+    env: {{- toYaml .Values.env | nindent 6 }}
+    command:
+      - /entrypoint.sh
+    args:
+      - sleep
+      - infinity
+    resources:
+      {{- toYaml .Values.resources | nindent 6 }}
+    {{- with .Values.volumeMounts }}
+    volumeMounts:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- with .Values.imagePullSecrets }}
+  imagePullSecrets:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- if .Values.serviceAccount.name }}
+  serviceAccountName: {{ .Values.serviceAccount.name }}
+  {{- end }}
+  {{- if .Values.hostNetwork }}
+  hostNetwork: true
+  {{- end }}
+  {{- with .Values.volumes }}
+  volumes:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.nodeSelector }}
+  nodeSelector:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.affinity }}
+  affinity:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+  {{- with .Values.tolerations }}
+  tolerations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+{{- end }}

@@ -1,6 +1,6 @@
 # etcd-backup
 
-![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.1.0](https://img.shields.io/badge/AppVersion-0.1.0-informational?style=flat-square)
+![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.1.1](https://img.shields.io/badge/AppVersion-0.1.1-informational?style=flat-square)
 
 ETCD backup tool
 
@@ -14,9 +14,9 @@ ETCD backup tool
 
 ### Create the "aws-s3" secret
 
-You could use [Vault secret](https://developer.hashicorp.com/vault/docs/platform/k8s/injector/annotations) or [externalsecret](https://external-secrets.io/v0.4.4/api-externalsecret) also
+You could use [Vault secret](https://developer.hashicorp.com/vault/docs/platform/k8s/injector/annotations) or [externalsecret](https://external-secrets.io/v0.4.4/api-externalsecret) also.
 
-VAULT_S3 variable contains path to Vault secret file (default is `/vault/secrets/s3`)
+VAULT_S3 variable contains path to Vault secret file (default path is `/vault/secrets/s3`)
 
 ```yaml
 apiVersion: v1
@@ -25,16 +25,34 @@ metadata:
   name: aws-s3
 type: Opaque
 data:
-  access_key: <AWS_ACCESS_KEY_ID>
-  secret_key: <AWS_ACCESS_SECRET_KEY>
-  bucket: <AWS S3 bucket name>
+  access_key: <AWS ACCESS_KEY_ID>
+  secret_key: <AWS ACCESS_SECRET_KEY>
+  bucket: <AWS S3 bucket>
+```
+
+### Optional `environment-name` configMap
+```
+apiVersion: v1
+kind: ConfigMap
+data:
+  env: my-cluster
 ```
 
 ### Setup [schedule](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs) in values.yaml
 
 Default schedule is "@monthly"
 
-```schedule: "@yearly"```
+```yaml
+backup
+  schedule: "@yearly"
+```
+
+#### Setup webhook for slack notification
+```yaml
+env:
+  - name: WEBHOOK_URL
+    value: "https://hooks.slack.com/services/<channel-id>"
+```
 
 ### Install the helm chart
 
@@ -42,12 +60,34 @@ Default schedule is "@monthly"
 helm install etcd-backup etcd-backup
 ```
 
+## TBD Restore the backup
+
+- Enable the pod
+```yaml
+pod:
+  enabled: true
+```
+
+- Exec into the pod and run etcd-backup.sh
+```bash
+# List backups in S3 bucket
+/etcd-backup.sh list
+
+# Download the backup from S3 bucket
+/etcd-backup.sh download <backup_name>
+
+# Restore the backup (the snapshot restore part should be performed manually)
+/etcd-backup.sh load <backup_name>
+```
+
 ## Values
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | affinity | object | `{}` |  |
-| debug | bool | `false` |  |
+| backup.args[0] | string | `"/etcd-backup.sh"` |  |
+| backup.args[1] | string | `"backup"` |  |
+| backup.schedule | string | `"@hourly"` |  |
 | env[0].name | string | `"cacert_file"` |  |
 | env[0].value | string | `"/opt/backup/etcd/ca.crt"` |  |
 | env[1].name | string | `"cert_file"` |  |
@@ -59,11 +99,9 @@ helm install etcd-backup etcd-backup
 | env[4].name | string | `"ACCESS_KEY_ID"` |  |
 | env[4].valueFrom.secretKeyRef.key | string | `"access_key"` |  |
 | env[4].valueFrom.secretKeyRef.name | string | `"aws-s3"` |  |
-| env[4].valueFrom.secretKeyRef.optional | bool | `true` |  |
 | env[5].name | string | `"ACCESS_SECRET_KEY"` |  |
 | env[5].valueFrom.secretKeyRef.key | string | `"secret_key"` |  |
 | env[5].valueFrom.secretKeyRef.name | string | `"aws-s3"` |  |
-| env[5].valueFrom.secretKeyRef.optional | bool | `true` |  |
 | env[6].name | string | `"S3_ENDPOINT"` |  |
 | env[6].valueFrom.secretKeyRef.key | string | `"endpoint"` |  |
 | env[6].valueFrom.secretKeyRef.name | string | `"aws-s3"` |  |
@@ -85,18 +123,18 @@ helm install etcd-backup etcd-backup
 | imagePullSecrets | list | `[]` |  |
 | nameOverride | string | `""` |  |
 | nodeSelector."node-role.kubernetes.io/control-plane" | string | `nil` |  |
+| pod.enabled | bool | `true` |  |
 | podAnnotations | object | `{}` |  |
 | podLabels."app.kubernetes.io/name" | string | `"etcd-backup"` |  |
 | podSecurityContext | string | `nil` |  |
 | resources.requests.cpu | string | `"100m"` |  |
 | resources.requests.memory | string | `"128Mi"` |  |
-| schedule | string | `"@monthly"` |  |
 | securityContext.capabilities.drop[0] | string | `"ALL"` |  |
 | securityContext.readOnlyRootFilesystem | bool | `true` |  |
 | securityContext.runAsNonRoot | bool | `true` |  |
 | securityContext.runAsUser | int | `5001` |  |
-| serviceAccount.enabled | bool | `false` |  |
-| serviceAccount.name | string | `""` |  |
+| serviceAccount.create | bool | `false` |  |
+| serviceAccount.name | string | `"postgres-pod"` |  |
 | tolerations[0].effect | string | `"NoSchedule"` |  |
 | tolerations[0].key | string | `"node-role.kubernetes.io/control-plane"` |  |
 | tolerations[0].operator | string | `"Exists"` |  |
@@ -109,8 +147,3 @@ helm install etcd-backup etcd-backup
 | volumes[0].name | string | `"etcd-certs"` |  |
 | volumes[1].emptyDir | object | `{}` |  |
 | volumes[1].name | string | `"data"` |  |
-
-### Update README
-
-The `README.md` for this chart is generated by [helm-docs](https://github.com/norwoodj/helm-docs).
-To update the README, edit the `README.md.gotmpl` file and run the helm-docs command.
