@@ -4,6 +4,13 @@ image:
   pullPolicy: Always
   tag: ""
 
+initContainer:
+  name: busybox
+  repository: busybox
+  tag: 1.37
+  # grant read permissions to etcd-backup group
+  command: "['sh', '-c', 'chgrp 5001 /opt/backup/etcd/server.key && chmod 0640 /opt/backup/etcd/server.key']"
+
 imagePullSecrets: []
 
 nameOverride: ""
@@ -18,8 +25,8 @@ podSecurityContext:
 # fsGroup: 5001
 
 serviceAccount:
-  create: false
-  name: postgres-pod
+  create: true
+  name: etcd-backup
 
 securityContext:
   capabilities:
@@ -28,6 +35,7 @@ securityContext:
   readOnlyRootFilesystem: true
   runAsNonRoot: true
   runAsUser: 5001
+  runAsGroup: 5001
 
 resources:
   requests:
@@ -46,11 +54,10 @@ volumeMounts:
     name: data
   - mountPath: /opt/backup/etcd
     name: etcd-certs
-    readOnly: true
 
 # run on controlplane
 nodeSelector:
-  node-role.kubernetes.io/control-plane:
+  node-role.kubernetes.io/control-plane: ""
 
 tolerations:
   - key: node-role.kubernetes.io/control-plane
@@ -68,7 +75,7 @@ pod:
 
 backup:
   # backup schedule
-  schedule: "@hourly"
+  schedule: "@monthly"
   # backup command arguments
   args:
     - /etcd-backup.sh
@@ -86,23 +93,23 @@ env:
   - name: ACCESS_KEY_ID
     valueFrom:
       secretKeyRef:
-        name: aws-s3
+        name: etcd-backup
         key: access_key
   - name: ACCESS_SECRET_KEY
     valueFrom:
       secretKeyRef:
-        name: aws-s3
+        name: etcd-backup
         key: secret_key
   - name: S3_ENDPOINT
     valueFrom:
       secretKeyRef:
-        name: aws-s3
+        name: etcd-backup
         key: endpoint
         optional: true
   - name: S3_BUCKET
     valueFrom:
       secretKeyRef:
-        name: aws-s3
+        name: etcd-backup
         key: bucket
         optional: true
   - name: ENV_NAME

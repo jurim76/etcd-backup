@@ -4,7 +4,20 @@ kind: Pod
 metadata:
   name: etcd-backup
   labels: {{- toYaml .Values.podLabels | nindent 4 }}
+  {{- if .Values.podAnnotations }}
+  annotations: {{- toYaml .Values.podAnnotations | nindent 4 }}
+  {{- end }}
 spec:
+  {{- if .Values.initContainer }}
+  initContainers:
+  - name: {{ .Values.initContainer.name }}
+    image: {{ .Values.image.registry }}/{{ .Values.initContainer.repository }}:{{ .Values.initContainer.tag }}
+    command: {{ .Values.initContainer.command }}
+    {{- with .Values.volumeMounts }}
+    volumeMounts:
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  {{- end }}
   containers:
   - name: {{ .Chart.Name }}
     securityContext:

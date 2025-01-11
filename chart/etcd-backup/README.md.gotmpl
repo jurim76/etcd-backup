@@ -17,7 +17,7 @@
 
 ## Getting Started
 
-#### Create the "aws-s3" secret
+#### Create the "etcd-backup" secret
 
 You could use [Vault secret](https://developer.hashicorp.com/vault/docs/platform/k8s/injector/annotations) or [externalsecret](https://external-secrets.io/v0.4.4/api-externalsecret) also.
 
@@ -27,7 +27,7 @@ VAULT_S3 variable contains path to Vault secret file (default path is `/vault/se
 apiVersion: v1
 kind: Secret
 metadata:
-  name: aws-s3
+  name: etcd-backup
 type: Opaque
 data:
   access_key: <AWS ACCESS_KEY_ID>

@@ -2,14 +2,17 @@
 
 export ETCDCTL_API=3
 
+# turn on debug messages
+# DEBUG=1
 dateStamp=$(date +%Y%m%d)
-dest_folder="."
 host=$(hostname -s)
-dest_file_name="etcd-snapshot_${host}_${dateStamp}"
-dest_file="$dest_folder/${dest_file_name}.db"
+temp_dir="temp"
+dest_file="etcd-snapshot_${host}_${dateStamp}.db"
 # slack channel webhook
-WEBHOOK_URL="$WEBHOOK_URL"
+WEBHOOK_URL=""
 S3_BUCKET="${S3_BUCKET:-etcd-backup}"
+
+cd "$HOME"
 
 if [ -z "$cacert_file" ] || ! [ -f "$cacert_file" ]; then
   echo "CA cert file is mandatory, please set it in ENV."
@@ -27,6 +30,7 @@ if [ -z "$etcd_endpoints" ]; then
   echo "ETCD Endpoints are mandatory, please set it in ENV."
   exit 1
 fi
+
 
 # send notification to slack channel
 function slack_alert() {
@@ -63,9 +67,8 @@ function get_snapshot() {
   echo "Generating snapshot file '$dest_file' ..."
   etcdctl snapshot save "$dest_file" --cacert="$cacert_file" --cert="$cert_file" --key="$key_file" --endpoints="$etcd_endpoints"
   local result=$?
-  echo "Snapshot done with code $result."
+  echo "Snapshot done"
   check_result $result
-  file "$dest_file"
   echo "Generating snapshot md5sum ..."
   md5sum "$dest_file" > "${dest_file}.md5sum"
   check_result $?
@@ -92,6 +95,11 @@ function verify_snapshot() {
   fi
   etcdutl --write-out=table snapshot status "$dest_file"
   check_result $?
+
+  remove_file "${dest_file}.password"
+  remove_file "${dest_file}.password.encrypted"
+  remove_file "${dest_file}.password.md5sum"
+  remove_file "${dest_file}.aes256"
 }
 
 function encrypt_snapshot() {
@@ -127,15 +135,15 @@ function decrypt_snapshot() {
   echo "Decrypting snapshot file '${dest_file}.aes256' ..."
 
   if ! [ -f "${dest_file}.aes256" ]; then
-    echo "Missing encrypted file!"
+    echo "Missing encrypted file ${dest_file}.aes256"
     check_result 1
   fi
   if ! [ -f "${dest_file}.password.encrypted" ]; then
-    echo "Missing encrypted password file!"
+    echo "Missing encrypted password file ${dest_file}.password.encrypted"
     check_result 1
   fi
   if ! [ -f "${key_file}" ]; then
-    echo "Missing private key file!"
+    echo "Missing private key file $key_file!"
     check_result 1
   fi
 
@@ -153,7 +161,7 @@ function decrypt_snapshot() {
   fi
 
   # decrypt the snapshot file, using previously decrypted password
-  echo "Decrypting snapshot file ..."
+  echo "Decrypting snapshot file ${dest_file} ..."
   openssl enc -d -pbkdf2 -aes-256-cbc -in "${dest_file}.aes256" -out "${dest_file}" -pass "file:${dest_file}.password"
   check_result $?
   if [ -f "${dest_file}.md5sum" ]; then
@@ -167,17 +175,18 @@ function decrypt_snapshot() {
 
 function compress() {
   if ! [ -f "${dest_file}.aes256" ]; then
-    echo "Missing encrypted snapshot file!"
+    echo "Missing encrypted snapshot file ${dest_file}.aes256"
     check_result 1
   fi
   if ! [ -f "${dest_file}.password.encrypted" ]; then
-    echo "Missing encrypted password file!"
+    echo "Missing encrypted password file ${dest_file}.password.encrypted"
     check_result 1
   fi
 
-  sleep 10
+  [ -d "$temp_dir" ] || mkdir "$temp_dir"
+
   echo "Archiving and compressing files ..."
-  tar -cjf "${dest_file}.tbz" ${dest_file}.*
+  tar -cjf "${temp_dir}/${dest_file}.tbz" ${dest_file}.*
   check_result $?
 
   remove_file "${dest_file}.password.encrypted"
@@ -215,17 +224,26 @@ function put_on_s3() {
 
 function remove_file() {
   local FILE_NAME="$1"
-  echo "Removing $FILE_NAME ..."
+  [ -n "$DEBUG" ] && echo "Removing file $FILE_NAME ..."
   rm -f "$FILE_NAME"
 }
 
+function remove_dir() {
+  local DIR_NAME="$1"
+  [ -n "$DEBUG" ] && echo "Removing directory $DIR_NAME ..."
+  rmdir "$DIR_NAME"
+}
+
 function upload_to_s3() {
+  cd "$temp_dir"
   if ! [ -f "${dest_file}.tbz" ]; then
     echo "Missing archived snapshot file!"
     check_result 1
   fi
   put_on_s3 "${dest_file}.tbz"
   remove_file "${dest_file}.tbz"
+  cd "$HOME"
+  remove_dir "${temp_dir}"
 }
 
 function download_from_s3() {

@@ -1,6 +1,6 @@
 # etcd-backup
 
-![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.1.1](https://img.shields.io/badge/AppVersion-0.1.1-informational?style=flat-square)
+![Version: 0.1.1](https://img.shields.io/badge/Version-0.1.1-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square) ![AppVersion: 0.1.1](https://img.shields.io/badge/AppVersion-0.1.1-informational?style=flat-square)
 
 ETCD backup tool
 
@@ -12,7 +12,7 @@ ETCD backup tool
 
 ## Getting Started
 
-### Create the "aws-s3" secret
+#### Create the "etcd-backup" secret
 
 You could use [Vault secret](https://developer.hashicorp.com/vault/docs/platform/k8s/injector/annotations) or [externalsecret](https://external-secrets.io/v0.4.4/api-externalsecret) also.
 
@@ -22,7 +22,7 @@ VAULT_S3 variable contains path to Vault secret file (default path is `/vault/se
 apiVersion: v1
 kind: Secret
 metadata:
-  name: aws-s3
+  name: etcd-backup
 type: Opaque
 data:
   access_key: <AWS ACCESS_KEY_ID>
@@ -30,15 +30,16 @@ data:
   bucket: <AWS S3 bucket>
 ```
 
-### Optional `environment-name` configMap
+#### Create optional `environment-name` configMap
 ```
 apiVersion: v1
 kind: ConfigMap
+name: environment-name
 data:
   env: my-cluster
 ```
 
-### Setup [schedule](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs) in values.yaml
+#### Define [schedule](https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs) in values.yaml
 
 Default schedule is "@monthly"
 
@@ -47,7 +48,7 @@ backup
   schedule: "@yearly"
 ```
 
-#### Setup webhook for slack notification
+#### Define webhook for slack notification
 ```yaml
 env:
   - name: WEBHOOK_URL
@@ -60,7 +61,7 @@ env:
 helm install etcd-backup etcd-backup
 ```
 
-## TBD Restore the backup
+### TBD Restore the backup
 
 - Enable the pod
 ```yaml
@@ -87,7 +88,7 @@ pod:
 | affinity | object | `{}` |  |
 | backup.args[0] | string | `"/etcd-backup.sh"` |  |
 | backup.args[1] | string | `"backup"` |  |
-| backup.schedule | string | `"@hourly"` |  |
+| backup.schedule | string | `"@monthly"` |  |
 | env[0].name | string | `"cacert_file"` |  |
 | env[0].value | string | `"/opt/backup/etcd/ca.crt"` |  |
 | env[1].name | string | `"cert_file"` |  |
@@ -98,17 +99,17 @@ pod:
 | env[3].value | string | `"https://127.0.0.1:2379"` |  |
 | env[4].name | string | `"ACCESS_KEY_ID"` |  |
 | env[4].valueFrom.secretKeyRef.key | string | `"access_key"` |  |
-| env[4].valueFrom.secretKeyRef.name | string | `"aws-s3"` |  |
+| env[4].valueFrom.secretKeyRef.name | string | `"etcd-backup"` |  |
 | env[5].name | string | `"ACCESS_SECRET_KEY"` |  |
 | env[5].valueFrom.secretKeyRef.key | string | `"secret_key"` |  |
-| env[5].valueFrom.secretKeyRef.name | string | `"aws-s3"` |  |
+| env[5].valueFrom.secretKeyRef.name | string | `"etcd-backup"` |  |
 | env[6].name | string | `"S3_ENDPOINT"` |  |
 | env[6].valueFrom.secretKeyRef.key | string | `"endpoint"` |  |
-| env[6].valueFrom.secretKeyRef.name | string | `"aws-s3"` |  |
+| env[6].valueFrom.secretKeyRef.name | string | `"etcd-backup"` |  |
 | env[6].valueFrom.secretKeyRef.optional | bool | `true` |  |
 | env[7].name | string | `"S3_BUCKET"` |  |
 | env[7].valueFrom.secretKeyRef.key | string | `"bucket"` |  |
-| env[7].valueFrom.secretKeyRef.name | string | `"aws-s3"` |  |
+| env[7].valueFrom.secretKeyRef.name | string | `"etcd-backup"` |  |
 | env[7].valueFrom.secretKeyRef.optional | bool | `true` |  |
 | env[8].name | string | `"ENV_NAME"` |  |
 | env[8].valueFrom.configMapKeyRef.key | string | `"env"` |  |
@@ -121,8 +122,12 @@ pod:
 | image.repository | string | `"etcd-backup"` |  |
 | image.tag | string | `""` |  |
 | imagePullSecrets | list | `[]` |  |
+| initContainer.command | string | `"['sh', '-c', 'chgrp 5001 /opt/backup/etcd/server.key && chmod 0640 /opt/backup/etcd/server.key']"` |  |
+| initContainer.name | string | `"busybox"` |  |
+| initContainer.repository | string | `"busybox"` |  |
+| initContainer.tag | float | `1.37` |  |
 | nameOverride | string | `""` |  |
-| nodeSelector."node-role.kubernetes.io/control-plane" | string | `nil` |  |
+| nodeSelector."node-role.kubernetes.io/control-plane" | string | `""` |  |
 | pod.enabled | bool | `true` |  |
 | podAnnotations | object | `{}` |  |
 | podLabels."app.kubernetes.io/name" | string | `"etcd-backup"` |  |
@@ -131,10 +136,11 @@ pod:
 | resources.requests.memory | string | `"128Mi"` |  |
 | securityContext.capabilities.drop[0] | string | `"ALL"` |  |
 | securityContext.readOnlyRootFilesystem | bool | `true` |  |
+| securityContext.runAsGroup | int | `5001` |  |
 | securityContext.runAsNonRoot | bool | `true` |  |
 | securityContext.runAsUser | int | `5001` |  |
-| serviceAccount.create | bool | `false` |  |
-| serviceAccount.name | string | `"postgres-pod"` |  |
+| serviceAccount.create | bool | `true` |  |
+| serviceAccount.name | string | `"etcd-backup"` |  |
 | tolerations[0].effect | string | `"NoSchedule"` |  |
 | tolerations[0].key | string | `"node-role.kubernetes.io/control-plane"` |  |
 | tolerations[0].operator | string | `"Exists"` |  |
@@ -142,7 +148,6 @@ pod:
 | volumeMounts[0].name | string | `"data"` |  |
 | volumeMounts[1].mountPath | string | `"/opt/backup/etcd"` |  |
 | volumeMounts[1].name | string | `"etcd-certs"` |  |
-| volumeMounts[1].readOnly | bool | `true` |  |
 | volumes[0].hostPath.path | string | `"/etc/kubernetes/pki/etcd"` |  |
 | volumes[0].name | string | `"etcd-certs"` |  |
 | volumes[1].emptyDir | object | `{}` |  |

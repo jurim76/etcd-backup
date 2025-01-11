@@ -1,7 +1,6 @@
 FROM debian:bookworm-slim
 
-LABEL version="0.1.1"
-LABEL maintainer="Juri Malinovski <coil93@gmail.com>"
+LABEL maintainer="Juri Malinovski <coil93@gmail.com"
 
 ARG ETCD_VERSION=v3.5.17
 ARG MINIO_URL=https://dl.min.io/client/mc/release/linux-amd64/mc
